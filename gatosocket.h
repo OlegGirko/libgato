@@ -6,6 +6,7 @@
 #include <QtCore/QSocketNotifier>
 
 #include "gatoaddress.h"
+#include "gatoconnectionparameters.h"
 
 /** This class encapsulates a message-oriented bluetooth L2CAP socket. */
 class GatoSocket : public QObject
@@ -48,6 +49,9 @@ public:
 
 	SecurityLevel securityLevel() const;
 	bool setSecurityLevel(SecurityLevel level);
+
+	GatoConnectionParameters connectionParameters() const;
+	bool setConnectionParameters(const GatoConnectionParameters &params);
 
 signals:
 	void connected();

@@ -5,6 +5,7 @@
 #include "libgato_global.h"
 #include "gatouuid.h"
 #include "gatoaddress.h"
+#include "gatoconnectionparameters.h"
 
 class GatoService;
 class GatoCharacteristic;
@@ -45,6 +46,9 @@ public:
 	GatoAddress address() const;
 	QString name() const;
 	QList<GatoService> services() const;
+
+	GatoConnectionParameters connectionParameters() const;
+	bool setConnectionParameters(const GatoConnectionParameters &params);
 
 	void parseEIR(quint8 data[], int len);
 	bool advertisesService(const GatoUUID &uuid) const;

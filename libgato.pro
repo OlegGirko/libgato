@@ -19,7 +19,8 @@ SOURCES += \
     gatoservice.cpp \
     gatocharacteristic.cpp \
     gatodescriptor.cpp \
-    gatoattclient.cpp
+    gatoattclient.cpp \
+    gatoconnectionparameters.cpp
 
 HEADERS += libgato_global.h gato.h \
     gatocentralmanager.h \
@@ -33,7 +34,8 @@ HEADERS += libgato_global.h gato.h \
     gatoservice.h \
     gatocharacteristic.h \
     gatodescriptor.h \
-    gatoattclient.h
+    gatoattclient.h \
+    gatoconnectionparameters.h
 
 target.path = /usr/lib
 INSTALLS += target
@@ -41,7 +43,7 @@ INSTALLS += target
 publicheaders.files = libgato_global.h gato.h \
 	gatocentralmanager.h gatoperipheral.h \
 	gatoservice.h gatocharacteristic.h gatodescriptor.h \
-	gatouuid.h gatoaddress.h
+        gatouuid.h gatoaddress.h gatoconnectionparameters.h
 publicheaders.path = /usr/include/gato
 INSTALLS += publicheaders
 

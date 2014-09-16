@@ -19,6 +19,12 @@ public:
 	bool connectTo(const GatoAddress& addr, GatoSocket::SecurityLevel sec_level);
 	void close();
 
+	GatoSocket::SecurityLevel securityLevel() const;
+	bool setSecurityLevel(GatoSocket::SecurityLevel level);
+
+	GatoConnectionParameters connectionParameters() const;
+	bool setConnectionParameters(const GatoConnectionParameters &params);
+
 	struct InformationData
 	{
 		GatoHandle handle;

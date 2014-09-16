@@ -28,6 +28,41 @@
 #include <bluetooth/l2cap.h>
 #include "gatosocket.h"
 
+#ifndef BT_LE_PARAMS
+/* Too old kernel headers. */
+#define BT_LE_PARAMS	100
+#define BT_LE_SCAN_WINDOW_MIN		0x0004
+#define BT_LE_SCAN_WINDOW_MAX		0x4000
+#define BT_LE_SCAN_WINDOW_DEF		0x0004
+#define BT_LE_SCAN_INTERVAL_MIN		0x0004
+#define BT_LE_SCAN_INTERVAL_MAX		0x4000
+#define BT_LE_SCAN_INTERVAL_DEF		0x0008
+#define BT_LE_CONN_INTERVAL_MIN		0x0006
+#define BT_LE_CONN_INTERVAL_MAX		0x0C80
+#define BT_LE_CONN_INTERVAL_MIN_DEF	0x0008
+#define BT_LE_CONN_INTERVAL_MAX_DEF	0x0100
+#define BT_LE_LATENCY_MAX		0x01F4
+#define BT_LE_LATENCY_DEF		0x0000
+#define BT_LE_SUP_TO_MIN		0x000A
+#define BT_LE_SUP_TO_MAX		0x0C80
+#define BT_LE_SUP_TO_DEFAULT		0X03E8
+
+struct bt_le_params {
+	uint8_t  prohibit_remote_chg;
+	uint8_t  filter_policy;
+	uint16_t scan_interval;
+	uint16_t scan_window;
+	uint16_t interval_min;
+	uint16_t interval_max;
+	uint16_t latency;
+	uint16_t supervision_timeout;
+	uint16_t min_ce_len;
+	uint16_t max_ce_len;
+	uint16_t conn_timeout;
+};
+
+#endif
+
 GatoSocket::GatoSocket(QObject *parent)
     : QObject(parent), s(StateDisconnected), fd(-1)
 {
@@ -156,8 +191,10 @@ bool GatoSocket::setSecurityLevel(SecurityLevel level)
 
 	if (s == StateDisconnected) {
 		qWarning() << "Socket not connected";
-		return SecurityNone;
+		return false;
 	}
+
+	memset(&bt_sec, 0, len);
 
 	switch (level) {
 	case SecurityNone:
@@ -168,16 +205,76 @@ bool GatoSocket::setSecurityLevel(SecurityLevel level)
 		bt_sec.level = BT_SECURITY_MEDIUM;
 		break;
 	case SecurityHigh:
-		// Will this even work in BT LE?
 		bt_sec.level = BT_SECURITY_HIGH;
 		break;
 	}
-	bt_sec.key_size = 0;
 
 	if (::setsockopt(fd, SOL_BLUETOOTH, BT_SECURITY, &bt_sec, len) == 0) {
 		return true;
 	} else {
 		qErrnoWarning("Could not set security level in L2 socket");
+		return false;
+	}
+}
+
+GatoConnectionParameters GatoSocket::connectionParameters() const
+{
+	GatoConnectionParameters params;
+	bt_le_params bt_params;
+	socklen_t len = sizeof(bt_params);
+
+	if (s == StateDisconnected) {
+		qWarning() << "Socket not connected";
+		return params;
+	}
+
+	if (::getsockopt(fd, SOL_BLUETOOTH, BT_LE_PARAMS, &bt_params, &len) == 0) {
+		if (bt_params.interval_min == 0 && bt_params.interval_max == 0) {
+			// Sometimes the kernel will give us this when no parameters have been set.
+			// I believe it is a bug, because in truth the kernel default parameters are in use.
+			qDebug() << "Filling in kernel defaults, since the kernel did not";
+			bt_params.interval_min = BT_LE_CONN_INTERVAL_MIN_DEF;
+			bt_params.interval_max = BT_LE_CONN_INTERVAL_MAX_DEF;
+			bt_params.latency = BT_LE_LATENCY_DEF;
+			bt_params.supervision_timeout = BT_LE_SUP_TO_DEFAULT;
+		}
+		// Kernel uses "multiples of 1.25ms", we use µs, need to convert.
+		params.setConnectionInterval(bt_params.interval_min * 1250, bt_params.interval_max * 1250);
+		// Kernel units already in ms.
+		params.setSlaveLatency(bt_params.latency);
+		// Kernel uses "multiples of 10ms", need to convert
+		params.setSupervisionTimeout(bt_params.supervision_timeout * 10);
+	} else {
+		qErrnoWarning("Could not read connection parameters from L2 socket");
+	}
+
+	return params;
+}
+
+bool GatoSocket::setConnectionParameters(const GatoConnectionParameters &params)
+{
+	bt_le_params bt_params;
+	socklen_t len = sizeof(bt_params);
+
+	if (s == StateDisconnected) {
+		qWarning() << "Socket not connected";
+		return false;
+	}
+
+	memset(&bt_params, 0, len);
+
+	// Kernel uses "multiples of 1.25ms", we use µs, need to convert
+	bt_params.interval_min = params.connectionIntervalMin() / 1250;
+	bt_params.interval_max = params.connectionIntervalMax() / 1250;
+	// Kernel units already "ms".
+	bt_params.latency = params.slaveLatency();
+	// Kernel uses "multiples of 10ms", need to convert
+	bt_params.supervision_timeout = params.supervisionTimeout() / 10;
+
+	if (::setsockopt(fd, SOL_BLUETOOTH, BT_LE_PARAMS, &bt_params, len) == 0) {
+		return true;
+	} else {
+		qErrnoWarning("Could not set connection parameters in L2 socket");
 		return false;
 	}
 }

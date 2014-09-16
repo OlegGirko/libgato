@@ -97,6 +97,18 @@ QList<GatoService> GatoPeripheral::services() const
 	return d->services.values();
 }
 
+GatoConnectionParameters GatoPeripheral::connectionParameters() const
+{
+	Q_D(const GatoPeripheral);
+	return d->att->connectionParameters();
+}
+
+bool GatoPeripheral::setConnectionParameters(const GatoConnectionParameters &params)
+{
+	Q_D(const GatoPeripheral);
+	return d->att->setConnectionParameters(params);
+}
+
 void GatoPeripheral::parseEIR(quint8 data[], int len)
 {
 	Q_D(GatoPeripheral);

@@ -103,6 +103,27 @@ void GatoAttClient::close()
 	socket->close();
 }
 
+GatoSocket::SecurityLevel GatoAttClient::securityLevel() const
+{
+	return socket->securityLevel();
+}
+
+bool GatoAttClient::setSecurityLevel(GatoSocket::SecurityLevel level)
+{
+	required_sec = level;
+	return socket->setSecurityLevel(level);
+}
+
+GatoConnectionParameters GatoAttClient::connectionParameters() const
+{
+	return socket->connectionParameters();
+}
+
+bool GatoAttClient::setConnectionParameters(const GatoConnectionParameters &params)
+{
+	return socket->setConnectionParameters(params);
+}
+
 int GatoAttClient::mtu() const
 {
 	return cur_mtu;
