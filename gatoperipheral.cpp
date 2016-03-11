@@ -347,7 +347,7 @@ void GatoPeripheral::readValue(const GatoDescriptor &descriptor)
 	if (state() == StateConnected) {
 		uint req = d->att->requestRead(descriptor.handle(),
 		                               d, SLOT(handleDescriptorRead(uint,QByteArray)));
-		d->pending_descriptor_read_reqs.insert(req, char_handle);
+		d->pending_descriptor_read_reqs.insert(req, desc_handle);
 	} else {
 		qWarning() << "Not connected";
 	}
