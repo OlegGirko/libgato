@@ -35,14 +35,14 @@ HEADERS += libgato_global.h gato.h \
     gatodescriptor.h \
     gatoattclient.h
 
-target.path = /usr/lib
-INSTALLS += target
+#target.path = /usr/lib
+#INSTALLS += target
 
-publicheaders.files = libgato_global.h gato.h \
-	gatocentralmanager.h gatoperipheral.h \
-	gatoservice.h gatocharacteristic.h gatodescriptor.h \
-	gatouuid.h gatoaddress.h
-publicheaders.path = /usr/include/gato
-INSTALLS += publicheaders
+#publicheaders.files = libgato_global.h gato.h \
+#	gatocentralmanager.h gatoperipheral.h \
+#	gatoservice.h gatocharacteristic.h gatodescriptor.h \
+#	gatouuid.h gatoaddress.h
+#publicheaders.path = /usr/include/gato
+#INSTALLS += publicheaders
 
 OTHER_FILES += rpm/libgato.yaml rpm/libgato.spec
