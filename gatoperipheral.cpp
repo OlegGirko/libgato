@@ -276,6 +276,7 @@ void GatoPeripheral::discoverDescriptors(const GatoCharacteristic &characteristi
 {
 	Q_D(GatoPeripheral);
 
+
 	GatoHandle char_handle = characteristic.startHandle();
 	GatoHandle service_handle = d->characteristic_to_service.value(char_handle);
 
@@ -288,6 +289,7 @@ void GatoPeripheral::discoverDescriptors(const GatoCharacteristic &characteristi
 	Q_ASSERT(our_service.containsCharacteristic(char_handle));
 	GatoCharacteristic our_char = our_service.getCharacteristic(char_handle);
 	Q_ASSERT(our_char.startHandle() == char_handle);
+
 
 	if (state() == StateConnected) {
 		d->clearCharacteristicDescriptors(&our_char);
@@ -782,7 +784,10 @@ void GatoPeripheralPrivate::handleDescriptors(uint req, const QList<GatoAttClien
 
 		foreach (const GatoAttClient::InformationData &data, list) {
 			// Skip the value attribute itself.
-			if (data.handle == characteristic.valueHandle()) continue;
+			if (data.handle == characteristic.valueHandle()) {
+				last_handle = data.handle;
+				continue;
+			}
 
 			GatoDescriptor descriptor;
 
