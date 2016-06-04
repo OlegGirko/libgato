@@ -16,7 +16,7 @@ public:
 
 	GatoSocket::State state() const;
 
-	bool connectTo(const GatoAddress& addr, GatoSocket::SecurityLevel sec_level);
+	bool connectTo(const GatoAddress& addr);
 	void close();
 
 	GatoSocket::SecurityLevel securityLevel() const;
@@ -99,7 +99,6 @@ private:
 	quint16 cur_mtu;
 	uint next_id;
 	QQueue<Request> pending_requests;
-	GatoSocket::SecurityLevel required_sec;
 };
 
 #endif // GATOATTCLIENT_H

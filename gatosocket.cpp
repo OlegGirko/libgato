@@ -61,10 +61,10 @@ struct bt_le_params {
 	uint16_t conn_timeout;
 };
 
-#endif
+#endif /* BT_LE_PARAMS */
 
 GatoSocket::GatoSocket(QObject *parent)
-    : QObject(parent), s(StateDisconnected), fd(-1)
+	: QObject(parent), s(StateDisconnected), fd(-1), desiredSec(SecurityLow)
 {
 }
 
@@ -95,6 +95,8 @@ bool GatoSocket::connectTo(const GatoAddress &addr, unsigned short cid)
 
 	s = StateConnecting;
 
+	setSecurityLevel(desiredSec);
+
 	readNotifier = new QSocketNotifier(fd, QSocketNotifier::Read, this);
 	writeNotifier = new QSocketNotifier(fd, QSocketNotifier::Write, this);
 	connect(readNotifier, SIGNAL(activated(int)), SLOT(readNotify()));
@@ -106,7 +108,24 @@ bool GatoSocket::connectTo(const GatoAddress &addr, unsigned short cid)
 	l2addr.l2_family = AF_BLUETOOTH;
 	l2addr.l2_cid = htobs(cid);
 #ifdef BDADDR_LE_PUBLIC
-	l2addr.l2_bdaddr_type = BDADDR_LE_PUBLIC; // TODO
+	switch (addr.type()) {
+	case GatoAddress::TypeBREDR:
+		l2addr.l2_bdaddr_type = BDADDR_BREDR;
+		break;
+	case GatoAddress::TypeLEPublic:
+	default:
+		l2addr.l2_bdaddr_type = BDADDR_LE_PUBLIC;
+		break;
+	case GatoAddress::TypeLERandom:
+		l2addr.l2_bdaddr_type = BDADDR_LE_RANDOM;
+		break;
+	}
+#else
+	// The kernel is probably too old to support this,
+	// but BLE might still work (e.g. Nokia N9).
+	if (addr.type() != GatoAddress::TypeLEPublic) {
+		qWarning() << "Kernel does not support random LE addresses!";
+	}
 #endif
 	addr.toUInt8Array(l2addr.l2_bdaddr.b);
 
@@ -162,59 +181,59 @@ GatoSocket::SecurityLevel GatoSocket::securityLevel() const
 	bt_security bt_sec;
 	socklen_t len = sizeof(bt_sec);
 
-	if (s == StateDisconnected) {
-		qWarning() << "Socket not connected";
-		return SecurityNone;
-	}
-
-	if (::getsockopt(fd, SOL_BLUETOOTH, BT_SECURITY, &bt_sec, &len) == 0) {
-		switch (bt_sec.level) {
-		case BT_SECURITY_SDP:
-			return SecurityNone;
-		case BT_SECURITY_LOW:
-			return SecurityLow;
-		case BT_SECURITY_MEDIUM:
-			return SecurityMedium;
-		case BT_SECURITY_HIGH:
-			return SecurityHigh;
+	if (s != StateDisconnected) {
+		if (::getsockopt(fd, SOL_BLUETOOTH, BT_SECURITY, &bt_sec, &len) == 0) {
+			switch (bt_sec.level) {
+			case BT_SECURITY_SDP:
+				return SecurityNone;
+			case BT_SECURITY_LOW:
+				return SecurityLow;
+			case BT_SECURITY_MEDIUM:
+				return SecurityMedium;
+			case BT_SECURITY_HIGH:
+				return SecurityHigh;
+			}
+		} else {
+			qErrnoWarning("Could not read security level from L2 socket");
 		}
-	} else {
-		qErrnoWarning("Could not read security level from L2 socket");
-	}
 
-	return SecurityNone;
+		return SecurityNone;
+	} else {
+		return desiredSec;
+	}
 }
 
 bool GatoSocket::setSecurityLevel(SecurityLevel level)
 {
-	bt_security bt_sec;
-	socklen_t len = sizeof(bt_sec);
+	desiredSec = level;
 
-	if (s == StateDisconnected) {
-		qWarning() << "Socket not connected";
-		return false;
-	}
+	if (s != StateDisconnected) {
+		bt_security bt_sec;
+		socklen_t len = sizeof(bt_sec);
 
-	memset(&bt_sec, 0, len);
+		memset(&bt_sec, 0, len);
 
-	switch (level) {
-	case SecurityNone:
-	case SecurityLow:
-		bt_sec.level = BT_SECURITY_LOW;
-		break;
-	case SecurityMedium:
-		bt_sec.level = BT_SECURITY_MEDIUM;
-		break;
-	case SecurityHigh:
-		bt_sec.level = BT_SECURITY_HIGH;
-		break;
-	}
+		switch (level) {
+		case SecurityNone:
+		case SecurityLow:
+			bt_sec.level = BT_SECURITY_LOW;
+			break;
+		case SecurityMedium:
+			bt_sec.level = BT_SECURITY_MEDIUM;
+			break;
+		case SecurityHigh:
+			bt_sec.level = BT_SECURITY_HIGH;
+			break;
+		}
 
-	if (::setsockopt(fd, SOL_BLUETOOTH, BT_SECURITY, &bt_sec, len) == 0) {
-		return true;
+		if (::setsockopt(fd, SOL_BLUETOOTH, BT_SECURITY, &bt_sec, len) == 0) {
+			return true;
+		} else {
+			qErrnoWarning("Could not set security level in L2 socket");
+			return false;
+		}
 	} else {
-		qErrnoWarning("Could not set security level in L2 socket");
-		return false;
+		return true;
 	}
 }
 

@@ -27,7 +27,8 @@ public:
 	~GatoPeripheral();
 
 	enum PeripheralConnectOption {
-		PeripheralConnectOptionRequireEncryption = 1 << 0
+		PeripheralConnectOptionRequireEncryption = 1 << 0,
+		PeripheralConnectOptionRequirePairing = 2 << 0
 	};
 	Q_DECLARE_FLAGS(PeripheralConnectOptions, PeripheralConnectOption)
 
@@ -54,7 +55,7 @@ public:
 	bool advertisesService(const GatoUUID &uuid) const;
 
 public slots:
-	void connectPeripheral(PeripheralConnectOptions options = 0);
+	bool connectPeripheral(PeripheralConnectOptions options = 0);
 	void disconnectPeripheral();
 
 	void discoverServices();

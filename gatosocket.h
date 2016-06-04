@@ -69,6 +69,7 @@ private slots:
 private:
 	State s;
 	int fd;
+	SecurityLevel desiredSec;
 	QSocketNotifier *readNotifier;
 	QQueue<QByteArray> readQueue;
 	QSocketNotifier *writeNotifier;

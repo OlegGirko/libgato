@@ -186,20 +186,29 @@ bool GatoPeripheral::advertisesService(const GatoUUID &uuid) const
 	return d->service_uuids.contains(uuid);
 }
 
-void GatoPeripheral::connectPeripheral(PeripheralConnectOptions options)
+bool GatoPeripheral::connectPeripheral(PeripheralConnectOptions options)
 {
 	Q_D(GatoPeripheral);
 	if (d->att->state() != GatoSocket::StateDisconnected) {
 		qDebug() << "Already connecting";
-		return;
+		return false;
 	}
 
-	GatoSocket::SecurityLevel sec_level = GatoSocket::SecurityLow;
+	d->att->setSecurityLevel(GatoSocket::SecurityLow);
 	if (options & PeripheralConnectOptionRequireEncryption) {
-		sec_level = GatoSocket::SecurityMedium;
+		if (!d->att->setSecurityLevel(GatoSocket::SecurityMedium)) {
+			qWarning() << "Could not set medium security level";
+			return false;
+		}
+	}
+	if (options & PeripheralConnectOptionRequirePairing) {
+		if (!d->att->setSecurityLevel(GatoSocket::SecurityHigh)) {
+			qWarning() << "Could not set medium security level";
+			return false;
+		}
 	}
 
-	d->att->connectTo(d->addr, sec_level);
+	return d->att->connectTo(d->addr);
 }
 
 void GatoPeripheral::disconnectPeripheral()
@@ -785,18 +794,17 @@ void GatoPeripheralPrivate::handleDescriptors(uint req, const QList<GatoAttClien
 		GatoHandle last_handle = 0;
 
 		foreach (const GatoAttClient::InformationData &data, list) {
-			// Skip the value attribute itself.
-			if (data.handle == characteristic.valueHandle()) continue;
+			// Only add attributtes other than the value itself
+			if (data.handle != characteristic.valueHandle()) {
+				GatoDescriptor descriptor;
+				descriptor.setHandle(data.handle);
+				descriptor.setUuid(data.uuid);
 
-			GatoDescriptor descriptor;
+				characteristic.addDescriptor(descriptor);
 
-			descriptor.setHandle(data.handle);
-			descriptor.setUuid(data.uuid);
-
-			characteristic.addDescriptor(descriptor);
-
-			service.addCharacteristic(characteristic);
-			descriptor_to_characteristic.insert(data.handle, char_handle);
+				service.addCharacteristic(characteristic);
+				descriptor_to_characteristic.insert(data.handle, char_handle);
+			}
 
 			last_handle = data.handle;
 		}
@@ -807,6 +815,9 @@ void GatoPeripheralPrivate::handleDescriptors(uint req, const QList<GatoAttClien
 			// Already finished, no need to send another request
 			finishSetNotifyOperations(characteristic);
 			emit q->descriptorsDiscovered(characteristic);
+			return;
+		} else if (last_handle == 0) {
+			qWarning() << "Invalid handle while enumerating characteristics";
 			return;
 		}
 

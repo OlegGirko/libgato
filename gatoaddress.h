@@ -10,16 +10,24 @@ class GatoAddressPrivate;
 class LIBGATO_EXPORT GatoAddress
 {
 public:
+	enum Type {
+		TypeNull,
+		TypeBREDR,
+		TypeLEPublic,
+		TypeLERandom
+	};
+
 	GatoAddress();
-	explicit GatoAddress(quint8 addr[]);
-	explicit GatoAddress(quint64 addr);
-	explicit GatoAddress(const QString &addr);
+	explicit GatoAddress(quint8 addr[], Type = TypeLEPublic);
+	explicit GatoAddress(quint64 addr, Type = TypeLEPublic);
+	explicit GatoAddress(const QString &addr, Type = TypeLEPublic);
 	GatoAddress(const GatoAddress& o);
 	~GatoAddress();
 
 	GatoAddress& operator=(const GatoAddress& o);
 
 	bool isNull() const;
+	Type type() const;
 
 	void toUInt8Array(quint8 addr[]) const;
 	quint64 toUInt64() const;

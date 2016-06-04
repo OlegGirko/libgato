@@ -31,34 +31,39 @@ struct GatoAddressPrivate : QSharedData
 		bdaddr_t bd;
 		quint64 u64;
 	} addr;
+	GatoAddress::Type type;
 };
 
 GatoAddress::GatoAddress()
     : d(new GatoAddressPrivate)
 {
 	d->addr.u64 = 0;
+	d->type = TypeNull;
 }
 
-GatoAddress::GatoAddress(quint64 addr)
+GatoAddress::GatoAddress(quint64 addr, Type type)
     : d(new GatoAddressPrivate)
 {
 	d->addr.u64 = addr;
+	d->type = type;
 }
 
-GatoAddress::GatoAddress(quint8 addr[])
+GatoAddress::GatoAddress(quint8 addr[], Type type)
     : d(new GatoAddressPrivate)
 {
 	d->addr.u64 = 0;
 	for (int i = 0; i < 6; i++) {
 		d->addr.bd.b[i] = addr[i];
 	}
+	d->type = type;
 }
 
-GatoAddress::GatoAddress(const QString &addr)
+GatoAddress::GatoAddress(const QString &addr, Type type)
     : d(new GatoAddressPrivate)
 {
 	d->addr.u64 = 0;
 	str2ba(addr.toLatin1().constData(), &d->addr.bd);
+	d->type = type;
 }
 
 GatoAddress::GatoAddress(const GatoAddress &o)
@@ -83,6 +88,11 @@ bool GatoAddress::isNull() const
 	return toUInt64() == 0;
 }
 
+GatoAddress::Type GatoAddress::type() const
+{
+	return d->type;
+}
+
 quint64 GatoAddress::toUInt64() const
 {
 	return d->addr.u64;
@@ -104,10 +114,10 @@ QString GatoAddress::toString() const
 
 bool operator==(const GatoAddress &a, const GatoAddress &b)
 {
-	return a.toUInt64() == b.toUInt64();
+	return a.toUInt64() == b.toUInt64() && a.type() == b.type();
 }
 
 uint qHash(const GatoAddress &a)
 {
-	return qHash(a.toUInt64());
+	return qHash(a.toUInt64() + a.type());
 }
