@@ -12,6 +12,11 @@ struct GatoConnectionParametersPrivate : public QSharedData
 GatoConnectionParameters::GatoConnectionParameters()
 	: d(new GatoConnectionParametersPrivate)
 {
+	// Set a connection scan interval between 10 and 320 ms.
+	d->connIntervalMin = 10000;
+	d->connIntervalMax = 320000;
+	d->slaveLatency = 0;
+	d->supervisionTimeout = 10000; // 10 seconds
 }
 
 GatoConnectionParameters::GatoConnectionParameters(const GatoConnectionParameters &o)

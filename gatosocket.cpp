@@ -31,21 +31,6 @@
 #ifndef BT_LE_PARAMS
 /* Too old kernel headers. */
 #define BT_LE_PARAMS	100
-#define BT_LE_SCAN_WINDOW_MIN		0x0004
-#define BT_LE_SCAN_WINDOW_MAX		0x4000
-#define BT_LE_SCAN_WINDOW_DEF		0x0004
-#define BT_LE_SCAN_INTERVAL_MIN		0x0004
-#define BT_LE_SCAN_INTERVAL_MAX		0x4000
-#define BT_LE_SCAN_INTERVAL_DEF		0x0008
-#define BT_LE_CONN_INTERVAL_MIN		0x0006
-#define BT_LE_CONN_INTERVAL_MAX		0x0C80
-#define BT_LE_CONN_INTERVAL_MIN_DEF	0x0008
-#define BT_LE_CONN_INTERVAL_MAX_DEF	0x0100
-#define BT_LE_LATENCY_MAX		0x01F4
-#define BT_LE_LATENCY_DEF		0x0000
-#define BT_LE_SUP_TO_MIN		0x000A
-#define BT_LE_SUP_TO_MAX		0x0C80
-#define BT_LE_SUP_TO_DEFAULT		0X03E8
 
 struct bt_le_params {
 	uint8_t  prohibit_remote_chg;
@@ -64,7 +49,8 @@ struct bt_le_params {
 #endif /* BT_LE_PARAMS */
 
 GatoSocket::GatoSocket(QObject *parent)
-	: QObject(parent), s(StateDisconnected), fd(-1), desiredSec(SecurityLow)
+	: QObject(parent), s(StateDisconnected), fd(-1),
+	  desiredSec(SecurityLow), desiredParams()
 {
 }
 
@@ -82,6 +68,9 @@ GatoSocket::State GatoSocket::state() const
 
 bool GatoSocket::connectTo(const GatoAddress &addr, unsigned short cid)
 {
+	struct sockaddr_l2 l2addr;
+	int err;
+
 	if (s != StateDisconnected) {
 		qWarning() << "Already connecting or connected";
 		return false;
@@ -95,16 +84,33 @@ bool GatoSocket::connectTo(const GatoAddress &addr, unsigned short cid)
 
 	s = StateConnecting;
 
-	setSecurityLevel(desiredSec);
+	// bind the socket to the BLE CID before connecting so that the kernel knows
+	memset(&l2addr, 0, sizeof(l2addr));
+	l2addr.l2_family = AF_BLUETOOTH;
+	l2addr.l2_cid = htobs(cid);
+
+	err = ::bind(fd, reinterpret_cast<sockaddr*>(&l2addr), sizeof(l2addr));
+	if (err == -1) {
+		qErrnoWarning("Could not bind L2CAP socket");
+		close();
+		return false;
+	}
+
+	if (!setSecurityLevel(desiredSec)) {
+		close();
+		return false;
+	}
+	if (!setConnectionParameters(desiredParams)) {
+		close();
+		return false;
+	}
 
 	readNotifier = new QSocketNotifier(fd, QSocketNotifier::Read, this);
 	writeNotifier = new QSocketNotifier(fd, QSocketNotifier::Write, this);
 	connect(readNotifier, SIGNAL(activated(int)), SLOT(readNotify()));
 	connect(writeNotifier, SIGNAL(activated(int)), SLOT(writeNotify()));
 
-	struct sockaddr_l2 l2addr;
 	memset(&l2addr, 0, sizeof(l2addr));
-
 	l2addr.l2_family = AF_BLUETOOTH;
 	l2addr.l2_cid = htobs(cid);
 #ifdef BDADDR_LE_PUBLIC
@@ -120,6 +126,7 @@ bool GatoSocket::connectTo(const GatoAddress &addr, unsigned short cid)
 		l2addr.l2_bdaddr_type = BDADDR_LE_RANDOM;
 		break;
 	}
+	qDebug() << "address type" << l2addr.l2_bdaddr_type;
 #else
 	// The kernel is probably too old to support this,
 	// but BLE might still work (e.g. Nokia N9).
@@ -129,7 +136,7 @@ bool GatoSocket::connectTo(const GatoAddress &addr, unsigned short cid)
 #endif
 	addr.toUInt8Array(l2addr.l2_bdaddr.b);
 
-	int err = ::connect(fd, reinterpret_cast<sockaddr*>(&l2addr), sizeof(l2addr));
+	err = ::connect(fd, reinterpret_cast<sockaddr*>(&l2addr), sizeof(l2addr));
 	if (err == -1 && errno != EINPROGRESS) {
 		qErrnoWarning("Could not connect to L2CAP socket");
 		close();
@@ -178,10 +185,10 @@ void GatoSocket::send(const QByteArray &pkt)
 
 GatoSocket::SecurityLevel GatoSocket::securityLevel() const
 {
-	bt_security bt_sec;
-	socklen_t len = sizeof(bt_sec);
-
 	if (s != StateDisconnected) {
+		bt_security bt_sec;
+		socklen_t len = sizeof(bt_sec);
+
 		if (::getsockopt(fd, SOL_BLUETOOTH, BT_SECURITY, &bt_sec, &len) == 0) {
 			switch (bt_sec.level) {
 			case BT_SECURITY_SDP:
@@ -240,62 +247,68 @@ bool GatoSocket::setSecurityLevel(SecurityLevel level)
 GatoConnectionParameters GatoSocket::connectionParameters() const
 {
 	GatoConnectionParameters params;
-	bt_le_params bt_params;
-	socklen_t len = sizeof(bt_params);
 
-	if (s == StateDisconnected) {
-		qWarning() << "Socket not connected";
-		return params;
-	}
+	if (s != StateDisconnected) {
+		bt_le_params bt_params;
+		socklen_t len = sizeof(bt_params);
 
-	if (::getsockopt(fd, SOL_BLUETOOTH, BT_LE_PARAMS, &bt_params, &len) == 0) {
-		if (bt_params.interval_min == 0 && bt_params.interval_max == 0) {
-			// Sometimes the kernel will give us this when no parameters have been set.
-			// I believe it is a bug, because in truth the kernel default parameters are in use.
-			qDebug() << "Filling in kernel defaults, since the kernel did not";
-			bt_params.interval_min = BT_LE_CONN_INTERVAL_MIN_DEF;
-			bt_params.interval_max = BT_LE_CONN_INTERVAL_MAX_DEF;
-			bt_params.latency = BT_LE_LATENCY_DEF;
-			bt_params.supervision_timeout = BT_LE_SUP_TO_DEFAULT;
+		if (::getsockopt(fd, SOL_BLUETOOTH, BT_LE_PARAMS, &bt_params, &len) == 0) {
+			qDebug() << "sinternal" << bt_params.scan_interval << "swindow" << bt_params.scan_window
+					 << "cinterval" << bt_params.interval_min << bt_params.interval_max
+					 << "latency" << bt_params.latency << "sup timeout" << bt_params.supervision_timeout;
+
+			if (bt_params.interval_min == 0 && bt_params.interval_max == 0) {
+				// Sometimes the kernel will give us this when no parameters have been set.
+				// I believe it is a bug, because in truth the kernel default parameters are in use.
+				qDebug() << "Assuming kernel defaults, since the kernel responded with empty interval";
+				return desiredParams;
+			}
+			// Kernel uses "multiples of 1.25ms", we use µs, need to convert.
+			params.setConnectionInterval(bt_params.interval_min * 1250, bt_params.interval_max * 1250);
+			// Kernel units already in ms.
+			params.setSlaveLatency(bt_params.latency);
+			// Kernel uses "multiples of 10ms", need to convert
+			params.setSupervisionTimeout(bt_params.supervision_timeout * 10);
+
+			return params;
+		} else {
+			qErrnoWarning("Could not read connection parameters from L2 socket");
 		}
-		// Kernel uses "multiples of 1.25ms", we use µs, need to convert.
-		params.setConnectionInterval(bt_params.interval_min * 1250, bt_params.interval_max * 1250);
-		// Kernel units already in ms.
-		params.setSlaveLatency(bt_params.latency);
-		// Kernel uses "multiples of 10ms", need to convert
-		params.setSupervisionTimeout(bt_params.supervision_timeout * 10);
-	} else {
-		qErrnoWarning("Could not read connection parameters from L2 socket");
 	}
 
-	return params;
+	return desiredParams;
 }
 
 bool GatoSocket::setConnectionParameters(const GatoConnectionParameters &params)
 {
-	bt_le_params bt_params;
-	socklen_t len = sizeof(bt_params);
+	desiredParams = params;
 
-	if (s == StateDisconnected) {
-		qWarning() << "Socket not connected";
-		return false;
-	}
+	if (s != StateDisconnected) {
+		bt_le_params bt_params;
+		socklen_t len = sizeof(bt_params);
 
-	memset(&bt_params, 0, len);
+		memset(&bt_params, 0, len);
 
-	// Kernel uses "multiples of 1.25ms", we use µs, need to convert
-	bt_params.interval_min = params.connectionIntervalMin() / 1250;
-	bt_params.interval_max = params.connectionIntervalMax() / 1250;
-	// Kernel units already "ms".
-	bt_params.latency = params.slaveLatency();
-	// Kernel uses "multiples of 10ms", need to convert
-	bt_params.supervision_timeout = params.supervisionTimeout() / 10;
+		// Kernel uses "multiples of 1.25ms", we use µs, need to convert
+		bt_params.interval_min = params.connectionIntervalMin() / 1250;
+		bt_params.interval_max = params.connectionIntervalMax() / 1250;
+		// Kernel units already "ms".
+		bt_params.latency = params.slaveLatency();
+		// Kernel uses "multiples of 10ms", need to convert
+		bt_params.supervision_timeout = params.supervisionTimeout() / 10;
 
-	if (::setsockopt(fd, SOL_BLUETOOTH, BT_LE_PARAMS, &bt_params, len) == 0) {
-		return true;
+		qDebug() << "sinternal" << bt_params.scan_interval << "swindow" << bt_params.scan_window
+				 << "cinterval" << bt_params.interval_min << bt_params.interval_max
+				 << "latency" << bt_params.latency << "sup timeout" << bt_params.supervision_timeout;
+
+		if (::setsockopt(fd, SOL_BLUETOOTH, BT_LE_PARAMS, &bt_params, len) == 0) {
+			return true;
+		} else {
+			qErrnoWarning("Could not set connection parameters in L2 socket");
+			return false;
+		}
 	} else {
-		qErrnoWarning("Could not set connection parameters in L2 socket");
-		return false;
+		return true;
 	}
 }
 

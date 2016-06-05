@@ -70,6 +70,7 @@ private:
 	State s;
 	int fd;
 	SecurityLevel desiredSec;
+	GatoConnectionParameters desiredParams;
 	QSocketNotifier *readNotifier;
 	QQueue<QByteArray> readQueue;
 	QSocketNotifier *writeNotifier;
