@@ -3,15 +3,20 @@
 
 struct GatoConnectionParametersPrivate : public QSharedData
 {
+	int scanInterval;
+	int scanWindow;
 	int connIntervalMin;
 	int connIntervalMax;
 	int slaveLatency;
 	int supervisionTimeout;
+	int connectionTimeout;
 };
 
 GatoConnectionParameters::GatoConnectionParameters()
 	: d(new GatoConnectionParametersPrivate)
 {
+	d->scanInterval = 10000; // 10 ms
+	d->scanWindow = 10000; // 10 ms
 	// Set a connection scan interval between 10 and 320 ms.
 	d->connIntervalMin = 10000;
 	d->connIntervalMax = 320000;
@@ -26,6 +31,26 @@ GatoConnectionParameters::GatoConnectionParameters(const GatoConnectionParameter
 
 GatoConnectionParameters::~GatoConnectionParameters()
 {
+}
+
+int GatoConnectionParameters::scanInterval() const
+{
+	return d->scanInterval;
+}
+
+void GatoConnectionParameters::setScanInterval(int interval)
+{
+	d->scanInterval = interval;
+}
+
+int GatoConnectionParameters::scanWindow() const
+{
+	return d->scanWindow;
+}
+
+void GatoConnectionParameters::setScanWindow(int interval)
+{
+	d->scanWindow = interval;
 }
 
 int GatoConnectionParameters::connectionIntervalMin() const
@@ -72,6 +97,16 @@ int GatoConnectionParameters::supervisionTimeout() const
 void GatoConnectionParameters::setSupervisionTimeout(int timeout)
 {
 	d->supervisionTimeout = timeout;
+}
+
+int GatoConnectionParameters::connectionTimeout() const
+{
+	return d->connectionTimeout;
+}
+
+void GatoConnectionParameters::setConnectionTimeout(int timeout)
+{
+	d->connectionTimeout = timeout;
 }
 
 GatoConnectionParameters &GatoConnectionParameters::operator=(const GatoConnectionParameters &o)

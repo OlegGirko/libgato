@@ -126,7 +126,6 @@ bool GatoSocket::connectTo(const GatoAddress &addr, unsigned short cid)
 		l2addr.l2_bdaddr_type = BDADDR_LE_RANDOM;
 		break;
 	}
-	qDebug() << "address type" << l2addr.l2_bdaddr_type;
 #else
 	// The kernel is probably too old to support this,
 	// but BLE might still work (e.g. Nokia N9).
@@ -253,22 +252,23 @@ GatoConnectionParameters GatoSocket::connectionParameters() const
 		socklen_t len = sizeof(bt_params);
 
 		if (::getsockopt(fd, SOL_BLUETOOTH, BT_LE_PARAMS, &bt_params, &len) == 0) {
-			qDebug() << "sinternal" << bt_params.scan_interval << "swindow" << bt_params.scan_window
-					 << "cinterval" << bt_params.interval_min << bt_params.interval_max
-					 << "latency" << bt_params.latency << "sup timeout" << bt_params.supervision_timeout;
-
 			if (bt_params.interval_min == 0 && bt_params.interval_max == 0) {
 				// Sometimes the kernel will give us this when no parameters have been set.
 				// I believe it is a bug, because in truth the kernel default parameters are in use.
 				qDebug() << "Assuming kernel defaults, since the kernel responded with empty interval";
 				return desiredParams;
 			}
+			// Kernel uses "multiples of 0.625ms", we use µs
+			params.setScanInterval(bt_params.scan_interval * 0625);
+			params.setScanWindow(bt_params.scan_window * 0625);
 			// Kernel uses "multiples of 1.25ms", we use µs, need to convert.
 			params.setConnectionInterval(bt_params.interval_min * 1250, bt_params.interval_max * 1250);
 			// Kernel units already in ms.
 			params.setSlaveLatency(bt_params.latency);
 			// Kernel uses "multiples of 10ms", need to convert
 			params.setSupervisionTimeout(bt_params.supervision_timeout * 10);
+			// Kernel uses seconds, we use ms
+			params.setConnectionTimeout(bt_params.conn_timeout * 1000);
 
 			return params;
 		} else {
@@ -289,6 +289,9 @@ bool GatoSocket::setConnectionParameters(const GatoConnectionParameters &params)
 
 		memset(&bt_params, 0, len);
 
+		// Kernel uses "multiples of 0.625ms", we use µs
+		bt_params.scan_interval = params.scanInterval() / 0625;
+		bt_params.scan_window = params.scanWindow() / 0625;
 		// Kernel uses "multiples of 1.25ms", we use µs, need to convert
 		bt_params.interval_min = params.connectionIntervalMin() / 1250;
 		bt_params.interval_max = params.connectionIntervalMax() / 1250;
@@ -296,10 +299,8 @@ bool GatoSocket::setConnectionParameters(const GatoConnectionParameters &params)
 		bt_params.latency = params.slaveLatency();
 		// Kernel uses "multiples of 10ms", need to convert
 		bt_params.supervision_timeout = params.supervisionTimeout() / 10;
-
-		qDebug() << "sinternal" << bt_params.scan_interval << "swindow" << bt_params.scan_window
-				 << "cinterval" << bt_params.interval_min << bt_params.interval_max
-				 << "latency" << bt_params.latency << "sup timeout" << bt_params.supervision_timeout;
+		// Kernel uses seconds, we use ms, need to convert
+		bt_params.conn_timeout = params.connectionTimeout() / 1000;
 
 		if (::setsockopt(fd, SOL_BLUETOOTH, BT_LE_PARAMS, &bt_params, len) == 0) {
 			return true;

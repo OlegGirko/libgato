@@ -20,8 +20,15 @@ public:
 	GatoConnectionParameters(const GatoConnectionParameters &o);
 	~GatoConnectionParameters();
 
-	// Units for all of this: milliseconds
 	// TODO Need to document
+
+	// Units: microseconds (µs!)
+
+	int scanInterval() const;
+	void setScanInterval(int interval);
+
+	int scanWindow() const;
+	void setScanWindow(int interval);
 
 	// Connection interval: generally, lower connection interval increases throughput.
 	// Units: microseconds (µs!)
@@ -42,6 +49,9 @@ public:
 	// Units: miliseconds
 	int supervisionTimeout() const;
 	void setSupervisionTimeout(int timeout);
+
+	int connectionTimeout() const;
+	void setConnectionTimeout(int timeout);
 
 	GatoConnectionParameters &operator=(const GatoConnectionParameters &o);
 
