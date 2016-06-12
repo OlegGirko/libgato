@@ -259,8 +259,8 @@ GatoConnectionParameters GatoSocket::connectionParameters() const
 				return desiredParams;
 			}
 			// Kernel uses "multiples of 0.625ms", we use µs
-			params.setScanInterval(bt_params.scan_interval * 0625);
-			params.setScanWindow(bt_params.scan_window * 0625);
+			params.setScanInterval(bt_params.scan_interval * 625);
+			params.setScanWindow(bt_params.scan_window * 625);
 			// Kernel uses "multiples of 1.25ms", we use µs, need to convert.
 			params.setConnectionInterval(bt_params.interval_min * 1250, bt_params.interval_max * 1250);
 			// Kernel units already in ms.
@@ -290,8 +290,8 @@ bool GatoSocket::setConnectionParameters(const GatoConnectionParameters &params)
 		memset(&bt_params, 0, len);
 
 		// Kernel uses "multiples of 0.625ms", we use µs
-		bt_params.scan_interval = params.scanInterval() / 0625;
-		bt_params.scan_window = params.scanWindow() / 0625;
+		bt_params.scan_interval = params.scanInterval() / 625;
+		bt_params.scan_window = params.scanWindow() / 625;
 		// Kernel uses "multiples of 1.25ms", we use µs, need to convert
 		bt_params.interval_min = params.connectionIntervalMin() / 1250;
 		bt_params.interval_max = params.connectionIntervalMax() / 1250;
