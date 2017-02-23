@@ -47,6 +47,7 @@ public:
 	GatoAddress address() const;
 	QString name() const;
 	QList<GatoService> services() const;
+	QByteArray advertData() const;
 
 	GatoConnectionParameters connectionParameters() const;
 	bool setConnectionParameters(const GatoConnectionParameters &params);

@@ -215,7 +215,25 @@ void GatoCentralManagerPrivate::handleAdvertising(le_advertising_info *info, int
 	         << "data length" << info->length
 	         << "rssi" << rssi;
 
-	GatoAddress addr(info->bdaddr.b);
+	GatoAddress::Type type;
+#ifdef BDADDR_LE_PUBLIC
+	switch (info->bdaddr_type) {
+	case BDADDR_BREDR:
+		type = GatoAddress::TypeBREDR;
+		break;
+	case BDADDR_LE_RANDOM:
+		type = GatoAddress::TypeLERandom;
+		break;
+	default:
+		type = GatoAddress::TypeLEPublic;
+		break;
+	}
+#else
+	type = GatoAddress::TypeLEPublic;
+#endif
+
+	GatoAddress addr(info->bdaddr.b, type);
+
 	GatoPeripheral *peripheral;
 	QHash<GatoAddress, GatoPeripheral*>::iterator it = peripherals.find(addr);
 	if (it == peripherals.end()) {
@@ -243,6 +261,6 @@ void GatoCentralManagerPrivate::handleAdvertising(le_advertising_info *info, int
 	}
 
 	if (passes_filter) {
-		emit q->discoveredPeripheral(peripheral, rssi);
+		emit q->discoveredPeripheral(peripheral, info->evt_type, rssi);
 	}
 }

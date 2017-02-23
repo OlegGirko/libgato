@@ -109,9 +109,17 @@ bool GatoPeripheral::setConnectionParameters(const GatoConnectionParameters &par
 	return d->att->setConnectionParameters(params);
 }
 
+QByteArray GatoPeripheral::advertData() const
+{
+	Q_D(const GatoPeripheral);
+	return d->advert_data;
+}
+
 void GatoPeripheral::parseEIR(quint8 data[], int len)
 {
 	Q_D(GatoPeripheral);
+
+	d->advert_data = QByteArray((char*)data, len);
 
 	int pos = 0;
 	while (pos < len) {
@@ -360,7 +368,7 @@ void GatoPeripheral::readValue(const GatoDescriptor &descriptor)
 	if (state() == StateConnected) {
 		uint req = d->att->requestRead(descriptor.handle(),
 		                               d, SLOT(handleDescriptorRead(uint,QByteArray)));
-		d->pending_descriptor_read_reqs.insert(req, char_handle);
+		d->pending_descriptor_read_reqs.insert(req, desc_handle);
 	} else {
 		qWarning() << "Not connected";
 	}
