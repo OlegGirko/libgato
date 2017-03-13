@@ -306,7 +306,7 @@ bool GatoSocket::setConnectionParameters(const GatoConnectionParameters &params)
 			return true;
 		} else {
 			qErrnoWarning("Could not set connection parameters in L2 socket");
-			return false;
+			return errno == EPROTONOSUPPORT;
 		}
 	} else {
 		return true;
